@@ -1,0 +1,5 @@
+uvicorn
+pandas
+fastapi
+nltk
+scikit-learn==0.21.3
