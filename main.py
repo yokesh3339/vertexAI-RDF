@@ -3,8 +3,8 @@ import os,sys
 from typing import List, Optional
 from pydantic import BaseModel
 from fastapi import FastAPI,Request,Response
-
-
+import subprocess
+#j=requests.post("http://127.0.0.1:8080/predict",json={"instances":"the ocr","parameters":{"State":"FL"}})
 
 app=FastAPI(title="Vertex AI Predictions")
 AIP_HEALTH_ROUTE = os.environ.get('AIP_HEALTH_ROUTE', '/health')
@@ -17,7 +17,7 @@ class ClassPrediction(BaseModel):
     Confidence: float
 
 class ClassPredictions(BaseModel):
-    prediction: List[ClassPrediction]
+    predictions: List[ClassPrediction]
 
 
 
@@ -61,7 +61,13 @@ import joblib
 
 if AIP_STORAGE_URI:
     #run command to download Model Directires from GCS
-    pass
+    print("AIP_STORAGE_URI",AIP_STORAGE_URI)
+    try:
+        print("before download",os.listdir("models"))
+        subprocess.run(['gsutil', '-m', 'cp', '-r', AIP_STORAGE_URI,"models"])
+        print("after download",os.listdir("models"))
+    except Exception as e:
+        print("download error",str(e))
 
 model=joblib.load("model.pkl")
 tfidf_vect_fit=joblib.load("tfidf.pkl")
@@ -79,7 +85,7 @@ async def predict(request:Request):
     print(body)
     out=[]
     ############## Prediction ###############
-    ocr_df=pd.DataFrame({"data":[instances]},dtype=str)
+    ocr_df=pd.DataFrame({"data":instances},dtype=str)
     pred_value=model.predict(vectorize(ocr_df["data"].values.astype('U'),tfidf_vect_fit))
     print(pred_value[0])
     pred_conf=max(model.predict_proba(vectorize(ocr_df["data"].values.astype('U'),tfidf_vect_fit))[0])
@@ -87,7 +93,7 @@ async def predict(request:Request):
     out.append(ClassPrediction(DocType=pred_value[0],Confidence=pred_conf))
     print(out)
 
-    return ClassPredictions(prediction=out)
+    return ClassPredictions(predictions=out)
 
 if __name__ == "__main__":
   import warnings
