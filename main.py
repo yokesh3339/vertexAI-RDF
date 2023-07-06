@@ -4,13 +4,14 @@ from typing import List, Optional
 from pydantic import BaseModel
 from fastapi import FastAPI,Request,Response
 import subprocess
+from google.cloud import storage
 #j=requests.post("http://127.0.0.1:8080/predict",json={"instances":"the ocr","parameters":{"State":"FL"}})
 
 app=FastAPI(title="Vertex AI Predictions")
 AIP_HEALTH_ROUTE = os.environ.get('AIP_HEALTH_ROUTE', '/health')
 AIP_PREDICT_ROUTE = os.environ.get('AIP_PREDICT_ROUTE', '/predict')
 AIP_STORAGE_URI = os.environ.get('AIP_STORAGE_URI')
-
+print("hello2")
 
 class ClassPrediction(BaseModel):
     DocType: str
@@ -64,13 +65,23 @@ if AIP_STORAGE_URI:
     print("AIP_STORAGE_URI",AIP_STORAGE_URI)
     try:
         print("before download",os.listdir("models"))
-        subprocess.run(['gsutil', '-m', 'cp', '-r', AIP_STORAGE_URI,"models"])
-        print("after download",os.listdir("models"))
+        aip_storage_uri = os.getenv("AIP_STORAGE_URI")
+        destination_directory = "/models"
+
+        if aip_storage_uri:
+            client = storage.Client()
+            bucket_name, prefix = aip_storage_uri[5:].split("/", 1)
+            bucket = client.bucket(bucket_name)
+            files = bucket.list_blobs(prefix=prefix)
+            for file in files:
+                print(file.name)
+                bucket.blob(file.name).download_to_filename("models/"+file.name.split("/")[-1])
+            print("after download",os.listdir("models"))
     except Exception as e:
         print("download error",str(e))
 
-model=joblib.load("model.pkl")
-tfidf_vect_fit=joblib.load("tfidf.pkl")
+model=joblib.load("models/model.pkl")
+tfidf_vect_fit=joblib.load("models/tfidf.pkl")
 
 
 
